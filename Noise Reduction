@@ -1,0 +1,36 @@
+import cv2
+import numpy
+
+resim = cv2.imread( "kapi.jpg " )
+
+hsv = cv2.cvtColor(resim, cv2.COLOR_BGR2HSV)
+yellowmax = numpy.array([50, 255, 255])
+yellowmin = numpy.array([21, 50, 50])
+
+mask = cv2.inRange(hsv, yellowmin, yellowmax)
+
+yeni_resim = cv2.bitwise_and(resim, resim, mask=mask)
+
+floodFillTH, thresh = cv2.threshold(mask, 220, 255, cv2.THRESH_BINARY)
+morph = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, (15, 15))
+
+median=cv2.medianBlur(yeni_resim,9)
+yeni_resim = cv2.resize(yeni_resim, (500, 500))
+median = cv2.resize(median, (500, 500))
+bulanıklık = cv2.GaussianBlur (median,(5,5),0)
+bulanıklık = cv2.resize(bulanıklık, (500, 500))
+blur = cv2.bilateralFilter(bulanıklık,9,75,75)
+blur = cv2.resize(blur, (500, 500))
+resim = cv2.resize(resim, (500, 500))
+
+opening = cv2.morphologyEx(blur, cv2.MORPH_OPEN, (5, 5))
+closing = cv2.morphologyEx(blur, cv2.MORPH_CLOSE, (5, 5))
+erosyon = cv2.dilate(blur,(5,5),iterations = 3)
+dilate = cv2.dilate(erosyon, None, iterations=3)
+
+cv2.imshow ( " resim ", resim)
+cv2.imshow (" dilate " , dilate )
+
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()

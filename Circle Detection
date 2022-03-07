@@ -1,0 +1,98 @@
+import numpy as np
+import cv2
+
+rLo, rHi, gLo, gHi, bLo, bHi = 20, 50, 100, 255, 100, 255
+
+cap = cv2.VideoCapture("circle1.mp4")
+def nothing(x):
+    pass
+
+cv2.namedWindow('marking')
+
+cv2.createTrackbar('H Lower','marking',0,179,nothing)
+cv2.createTrackbar('H Higher','marking',52,179,nothing)
+cv2.createTrackbar('S Lower','marking',66,255,nothing)
+cv2.createTrackbar('S Higher','marking',250,255,nothing)
+cv2.createTrackbar('V Lower','marking',100,255,nothing)
+cv2.createTrackbar('V Higher','marking',168,255,nothing)
+
+def detection(imageFrame):
+	hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
+
+	bLo = cv2.getTrackbarPos('H Lower', 'marking')
+	bHi = cv2.getTrackbarPos('H Higher', 'marking')
+	gLo = cv2.getTrackbarPos('S Lower', 'marking')
+	gHi = cv2.getTrackbarPos('S Higher', 'marking')
+	rLo = cv2.getTrackbarPos('V Lower', 'marking')
+	rHi = cv2.getTrackbarPos('V Higher', 'marking')
+	yellow_lower = np.array([bLo, gLo, rLo], np.uint8)
+	yellow_upper = np.array([bHi, gHi, rHi], np.uint8)
+	yellow_mask = cv2.inRange(hsvFrame, yellow_lower,yellow_upper)
+	
+	dilateKernel = np.ones((9, 9), "uint8")
+	erodeKernel = np.ones((15,15),"uint8")
+	morphKernel = np.ones((3,3),"uint8")
+
+	floodFillTH, thresh = cv2.threshold(yellow_mask,220, 255, cv2.THRESH_BINARY)
+	morph = cv2.morphologyEx(thresh,cv2.MORPH_OPEN,morphKernel)
+	blur = cv2.medianBlur(morph,ksize=3)
+	erode = cv2.erode(blur, None, iterations = 1)
+	dilate = cv2.dilate(erode, None, iterations = 1)
+
+	res_yellow = cv2.bitwise_and(imageFrame, imageFrame,
+							mask = dilate)
+
+	contours, hierarchy = cv2.findContours(dilate,
+										cv2.RETR_EXTERNAL,
+										cv2.CHAIN_APPROX_SIMPLE)
+	
+	for pic, contour in enumerate(contours):
+		approx = cv2.approxPolyDP(contour,0.01*cv2.arcLength(contour,True),True)
+		n = len(approx)
+		area = cv2.contourArea(contour)
+		if (area>30) and (n>10):
+			x, y, w, h = cv2.boundingRect(contour)
+			imageFrame = cv2.rectangle(imageFrame, (x, y),
+									(x + w, y + h),
+									(255, 198, 109), 2)
+			cv2.putText(imageFrame, "Yellow", (x, y),
+						cv2.FONT_HERSHEY_SIMPLEX,
+						1.0, (134, 76, 190))
+			
+			return imageFrame, [x,y,w,h], res_yellow, erode, dilate, yellow_mask, cv2.drawContours(np.zeros(imageFrame.shape), contours, pic, 255, -1), thresh, morph
+	return imageFrame, None, res_yellow, erode, dilate, yellow_mask, np.zeros(imageFrame.shape), thresh, morph
+
+while True:
+	_,img = cap.read()
+	img, coords, res_yellow, erode, dilate, yellow_mask, contours, thresh, morph = detection(img)
+	img = cv2.resize(img,(200,200))
+	res_yellow = cv2.resize(res_yellow, (200, 200))
+	erode = cv2.resize(erode,(200,200))
+	contours = cv2.resize(contours,(200,200))
+	dilate = cv2.resize(dilate,(200,200))
+	yellow_mask = cv2.resize(yellow_mask, (200, 200))
+	thresh = cv2.resize(thresh,(200,200))
+	morph = cv2.resize(morph,(200,200))
+	cv2.imshow("yellow_mask", yellow_mask)
+	cv2.imshow("contours", contours)
+	cv2.imshow("dilate", dilate)
+	cv2.imshow("contours", contours)
+	cv2.imshow("erode", erode)
+	cv2.imshow("res_yellow", res_yellow)
+	cv2.imshow("frame", img)
+	cv2.imshow("thresh", thresh)
+	cv2.imshow("morph", morph)
+	cv2.moveWindow("yellow_mask",0,0)
+	cv2.moveWindow("dilate",0,250)
+	cv2.moveWindow("contours",0,500)
+	cv2.moveWindow("erode",400,0)
+	cv2.moveWindow("res_yellow",400,250)
+	cv2.moveWindow("frame",400,500)
+	cv2.moveWindow("thresh",800,250)
+	cv2.moveWindow("morph",800,500)
+	key = cv2.waitKey(30)
+	if key & 0xFF == ord("q"):
+		cv2.destroyAllWindows()
+		break
+	if key == ord("p"):
+		cv2.waitKey(-1)
